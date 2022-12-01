@@ -57,6 +57,16 @@ function send_mail(email_to) {
 
   mailer(message);
 }
+/*con.query("select * from users where email='test@mail.com'" , function (err, result, fields) {
+  if (err) {
+    console.log("I have problem with insert find application");
+  }
+  console.log(result[0]);
+});*/
+
+
+
+
 
 function createLead(template) {
   return new Promise((resolve, reject) => {
@@ -118,24 +128,181 @@ app.get('/', (req, res) => {
   res.send('Hello World!')
 })
 
+app.post('/signup', (req, res) => {
+  try {
+    con.query("SELECT MAX(user_id) FROM users", function (err, result, fields) {
+      if (err) { }
+      else {
+        const str = "insert into users values(" + String(result[0]['MAX(user_id)'] + 1) + ",'" + String(req.body.email + "','" + String(req.body.name) + "','" + String(req.body.password) + "')");
+        con.query(str, function (err, result, fields) {
+          if (err) { }
+          else {
+            res.send({
+              can: "1"
+            });
+          }
+        });
+      }
+    });
+
+
+  }
+  catch {
+    res.send({
+      can: "-1"
+    });
+  }
+})
+
 app.post('/signin', (req, res) => {
-
-
-  /*con.query("SELECT MAX(buy_id) FROM buy", function (err, result, fields) {
+  const str = "select * from users where email='" + String(req.body.email) + "'";
+  con.query(str, function (err, result, fields) {
     if (err) {
-      console.log("I have problem with base");
-    } 
-  });*/
-  console.log(req);
-  con.query("select * from users where email="+ String(req.email), function (err, result, fields) {
-    if (err) {
-      console.log("I have problem with insert find application");
     }
+    else {
+      //если совпадают пароли, то отправляем токен, в противном случае отпраляем -1
+      try {
+        if (req.body.password == result[0].user_password) {
+          console.log("Пароли совпадают");
+          res.send({
+            token: result[0].user_id
+          });
+        }
+        else {
+          res.send({
+            token: "-1"
+          });
+        }
+      }
+      catch {
+        res.send({
+          token: "-1"
+        });
+      }
+    }
+
+
   });
 
-  res.send({
-    token: 'test123'
-  });
+
+
+
+})
+
+
+function set_arr(params){
+  setTimeout(function() {
+    arr = params;
+}, 2000);
+
+}
+
+
+app.post('/get_block', (req, res) => {
+  let arr = []
+  console.log("get block");
+  console.log(req);
+
+  /*const get_all = "select * from buy where user_id="+ String(req.body.user_id);*/
+  /*get block
+  blocks  video_id
+  1         1
+  1         2*/
+  con.query("select max(block_id) from blocks", function (err, result, fields) {
+    if (err) { }
+    else {
+      /*получаю все купленные блоки*/
+      console.log(req);
+      console.log("215 ",req.query['user_id']);
+      const query = "select blocks from buy where user_id="+String(req.body['user_id'])+" and video=0";
+      console.log(query);
+      con.query(query, function(err, result,field){
+        if (err){
+          console.log("ошибка 1");
+        }
+        else{
+          console.log("219 ",result);
+          let arr_block = [];
+          for (let i=0;i<result.length;i++){
+            arr_block.push(result[i]['blocks']);
+          }
+          console.log("228",arr_block);
+          /*arr_block=[1,2,5]
+          идем по всем блокам, если он в списке то получаем его видео, если нет, то ищуме среи купленных, если и там нет, то загружаем превью*/
+          con.query("select max(block_id) from blocks", function(err, result_new, field){
+            if (err){console.log("ошибка 2");}
+            else{
+              console.log("230",result_new);
+              for (let i=1;i<result_new[0]['max(block_id)']+1;i++){
+                if (arr_block.indexOf(i)!= -1){
+                  //блок есть в списке купленных
+                  console.log("234, блок есть в списке купленных");
+                  const get_block = "select vid.link, vid.video_description from buy b, blocks bl, video vid where b.blocks=bl.block_id and vid.video_id= bl.video_id and user_id="+String(req.body['user_id'])+" and video=0 and b.blocks="+String(i);
+                  con.query(get_block, function (err, result_new_new, fields) {
+                    if (err) {
+                      console.log("ошибка 3");
+                    }
+                    else {                 
+                      arr.push(result_new_new);
+                      console.log("242, ",arr);
+                    }
+                    console.log("241 ",arr);
+                    if (i==result_new[0]['max(block_id)']){
+                      console.log("248, Это была последняя итерация");
+                      res.send(arr);
+                    }
+                  })
+
+                }
+                else{
+                  /*берем все купленные видео в этом блоке*/
+                  const get_video = "select v.link, v.video_description from buy b, video v, blocks bl where b.user_id="+String(req.body['user_id'])+" and b.blocks=0 and b.video=v.video_id and b.video= bl.video_id and block_id="+String(i);
+                  con.query(get_video, function(err, result_new_new, fields){
+                    if (err){}
+                    else{
+                      arr.push(result_new_new);
+                      console.log("261, ", arr);
+                      console.log("267, ", i);
+                      console.log("268", result[0]['max(block_id)']);
+                      if (i==result_new[0]['max(block_id)']){
+                        console.log("263, Это была последняя итерация");
+                        console.log("264, ", arr);
+                        res.send(arr);
+                      }
+                    }
+                  });
+
+                }
+              }
+            }
+          });
+        }
+      });
+      const max = result[0]['max(block_id)'];
+      /*for (let i =1;i<max;i++){
+        
+        con.query(get_block, function (err, result_new, fields) {
+          if (err) {
+          }
+          else {
+            console.log("result_new = ", result_new);
+            arr.push(result_new)
+            console.log("arr1 = ", arr);
+            if (arr.length == max-1){
+              res.send(arr);
+            }
+          }
+          console.log("arr2 = ", arr);
+        })
+      }*/
+
+    }
+    
+  }
+  );
+  arr = [];
+
+
 })
 
 
