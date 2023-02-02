@@ -18,7 +18,7 @@ const con = mysql.createConnection({
 const express = require('express')
 const app = express()
 const port = 3002
-const bitrix24Url = "https://property.bitrix24.ru/rest/1/e08ml252uxlxhrws/";
+const bitrix24Url = "";
 
 function send_mail(email_to) {
   const message = {
